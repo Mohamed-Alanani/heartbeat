@@ -1,22 +1,26 @@
 # heartbeat
 
-> Anthropic built an always-on background agent into Claude Code and never told anyone.  
-> The leak revealed it. This is the open version.
+> Your harness. Your memory.
 
----
+Anthropic built KAIROS — an always-on background agent — into 
+Claude Code and never told anyone. The leak revealed it.
 
-**KAIROS** is a hidden feature inside Claude Code — gated behind internal flags, never announced.  
-It runs in the background, 24/7, without you asking.  
-Every few seconds it receives one prompt:
+Then they launched Claude Managed Agents: the same pattern, 
+locked behind their API at $0.08/hour. Your memory. Their servers.
 
-> *"Anything worth doing right now?"*
+heartbeat is the open version.
+
+Runs on your machine. Model-agnostic. Zero vendor lock-in.
+Your learnings stay in `.heartbeat/learnings.jsonl` — a file 
+you own, you read, you export, you take anywhere.
+
+Every N seconds, one question:
+> "Anything worth doing right now?"
 
 If yes — it acts. If no — it waits.
 
-`heartbeat` implements that pattern as a standalone, model-agnostic daemon you can attach to any project.
-
 > Every other open harness waits for you.  
-> heartbeat doesn't.
+> heartbeat doesn't
 
 ---
 
@@ -134,16 +138,6 @@ only the client call needs swapping.
 - [ ] Web dashboard for log viewing
 
 ---
-
-## vs. Claude Managed Agents
-
-Anthropic launched Managed Agents on April 8, 2026.
-It runs your agent on their cloud for $0.08/hour — $58/month 
-before token costs.
-
-heartbeat runs on your machine.
-$0/month. No vendor lock-in. Your data stays local.
-Same KAIROS pattern. Zero infrastructure.
 
 ## Contributing
 
