@@ -42,15 +42,50 @@ log = logging.getLogger("heartbeat")
 
 MEMORY_DIR = Path(".heartbeat/memory")
 MEMORY_DIR.mkdir(parents=True, exist_ok=True)
-MEMORY_FILE = MEMORY_DIR / "context.md"
+LEARNINGS_FILE = MEMORY_DIR / "learnings.jsonl"
+
+def write_learning(type: str, key: str, insight: str, confidence: int, source: str = "heartbeat") -> None:
+    """Append a structured learning entry — same schema as gstack /learn."""
+    entry = {
+        "ts": datetime.datetime.now().isoformat(),
+        "type": type,        # pattern | pitfall | observation | architecture
+        "key": key,          # 2-5 words kebab-case
+        "insight": insight,  # one sentence
+        "confidence": confidence,  # 1-10
+        "source": source,
+    }
+    with open(LEARNINGS_FILE, "a") as f:
+        f.write(json.dumps(entry) + "\n")
 
 def load_memory() -> str:
-    if MEMORY_FILE.exists():
-        return MEMORY_FILE.read_text()
-    return ""
+    """Load learnings as readable context for the next tick."""
+    if not LEARNINGS_FILE.exists():
+        return ""
+    lines = LEARNINGS_FILE.read_text().strip().splitlines()
+    if not lines:
+        return ""
+    # Return last 20 entries as readable summary
+    recent = [json.loads(l) for l in lines[-20:] if l.strip()]
+    return "\n".join(f"[{e['type']}] {e['key']}: {e['insight']} (confidence: {e['confidence']}/10)" for e in recent)
 
-def save_memory(content: str) -> None:
-    MEMORY_FILE.write_text(content)
+def show_learnings() -> None:
+    """Print all learnings grouped by type."""
+    if not LEARNINGS_FILE.exists():
+        print("No learnings yet.")
+        return
+    lines = LEARNINGS_FILE.read_text().strip().splitlines()
+    entries = [json.loads(l) for l in lines if l.strip()]
+    # Dedup by key — latest wins
+    seen = {}
+    for e in entries:
+        seen[e["key"]] = e
+    by_type = {}
+    for e in seen.values():
+        by_type.setdefault(e["type"], []).append(e)
+    for t, items in sorted(by_type.items()):
+        print(f"\n── {t.upper()} ──")
+        for e in sorted(items, key=lambda x: -x["confidence"]):
+            print(f"  [{e['confidence']}/10] {e['key']}: {e['insight']}")
 
 def consolidate_memory(client, current_memory: str, todays_log: str) -> str:
     """
@@ -110,6 +145,9 @@ Respond in JSON:
   "decision": "act" | "wait",
   "reasoning": "one sentence",
   "action_taken": "description of what you did (if acting)",
+  "learning_type": "pattern" | "pitfall" | "observation" | "architecture",
+  "learning_key": "2-5-word-kebab-case-key",
+  "confidence": 1-10,
   "memory_update": "any new insight to remember (optional)"
 }"""
 
@@ -154,6 +192,16 @@ Anything worth doing right now?"""
 
         if decision == "act":
             log.info(f"[ACT] {action}")
+            learning_key = result.get("learning_key", "observation")
+            learning_type = result.get("learning_type", "observation")
+            confidence = result.get("confidence", 5)
+            if action:
+                write_learning(
+                    type=learning_type,
+                    key=learning_key,
+                    insight=action,
+                    confidence=confidence,
+                )
             if memory_update:
                 return memory_update
         else:
@@ -207,20 +255,17 @@ def run(
     try:
         while True:
             tick_number += 1
+            memory = load_memory()
             update = tick(client, project_context, memory, tick_number)
-
             if update:
                 memory_updates.append(update)
-                # Append update to memory immediately
-                memory = memory + f"\n\n[{datetime.datetime.now().isoformat()}] {update}"
-                save_memory(memory)
 
             # autoDream: consolidate memory once per dream_interval
             now = time.time()
             if now - last_dream >= dream_interval and memory_updates:
                 todays_log = log_file.read_text() if log_file.exists() else ""
-                memory = consolidate_memory(client, memory, todays_log)
-                save_memory(memory)
+                consolidated = consolidate_memory(client, load_memory(), todays_log)
+                write_learning("observation", "autodream-summary", consolidated[:200], 7, "autodream")
                 memory_updates.clear()
                 last_dream = now
                 log.info("autoDream complete")
@@ -248,7 +293,15 @@ if __name__ == "__main__":
         "--dream-interval", type=int, default=86400,
         help="Seconds between memory consolidations (default: 86400 = 24h)"
     )
+    parser.add_argument(
+        "--learn", action="store_true",
+        help="Show all learnings grouped by type and exit"
+    )
     args = parser.parse_args()
+
+    if args.learn:
+        show_learnings()
+        exit(0)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("Error: ANTHROPIC_API_KEY environment variable not set")
