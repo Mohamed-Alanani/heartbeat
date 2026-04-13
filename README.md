@@ -73,6 +73,22 @@ python heartbeat.py --interval 60 --context my_project_context.md
     └── logs/
         └── 2026-04-12.log
 ```
+## Architecture
+
+Fat skills on top — learnings.jsonl encodes what 
+the agent discovered. Structured, searchable, yours.
+
+Thin harness in the middle — heartbeat.py, ~200 lines.
+JSON in, text out. Read-only by default.
+
+Your project on the bottom — CLAUDE.md, README.md, 
+or any context file. The deterministic foundation.
+
+Push intelligence up into learnings.
+Push execution down into your existing project files.
+Keep the harness thin.
+
+Every model improvement automatically improves every tick.
 
 
 ## The KAIROS architecture
